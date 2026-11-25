@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: surpluss-postgres
+    environment:
+      POSTGRES_USER: surpluss
+      POSTGRES_PASSWORD: surpluss_dev
+      POSTGRES_DB: surpluss_webhooks
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U surpluss -d surpluss_webhooks"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

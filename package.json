@@ -1,0 +1,20 @@
+{
+  "name": "surpluss-webhook-processor",
+  "version": "1.0.0",
+  "description": "A small service that receives webhook events and processes them reliably using background workers.",
+  "main": "index.js",
+  "scripts": {
+    "migrate": "node-pg-migrate up --migrations-dir migrations",
+    "migrate:down": "node-pg-migrate down --migrations-dir migrations",
+    "migrate:dry": "node-pg-migrate up --migrations-dir migrations --dry-run",
+    "migrate:test": "node --env-file=.env.test ./node_modules/node-pg-migrate/bin/node-pg-migrate.js up --migrations-dir migrations"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "node-pg-migrate": "^9.0.0",
+    "pg": "^8.23.1"
+  }
+}
