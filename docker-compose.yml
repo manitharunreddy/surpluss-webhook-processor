@@ -1,7 +1,33 @@
+x-database-environment: &database-environment
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: surpluss
+  DB_PASSWORD: surpluss_dev
+  DB_NAME: surpluss_webhooks
+
+x-worker-environment: &worker-environment
+  <<: *database-environment
+  WORKER_POLL_INTERVAL_MS: "500"
+  MAX_ATTEMPTS: "5"
+  RETRY_BASE_DELAY_MS: "2000"
+  RETRY_MAX_DELAY_MS: "60000"
+
+x-worker-service: &worker-service
+  image: surpluss-worker:local
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    migrations:
+      condition: service_completed_successfully
+
 services:
+
+  # PostgreSQL Database
   postgres:
     image: postgres:17
     container_name: surpluss-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: surpluss
       POSTGRES_PASSWORD: surpluss_dev
@@ -15,6 +41,92 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Automatic Database Migrations
+  migrations:
+    image: node:24-alpine
+    container_name: surpluss-migrations
+    working_dir: /app
+    volumes:
+      - ./migrations:/app/migrations:ro
+      - ./package.json:/app/package.json:ro
+      - ./package-lock.json:/app/package-lock.json:ro
+    environment:
+      DATABASE_URL: postgresql://surpluss:surpluss_dev@postgres:5432/surpluss_webhooks
+    command: sh -c "npm ci && npm run migrate"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # NestJS Backend
+  backend:
+    container_name: surpluss-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *database-environment
+      PORT: "3001"
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3001/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Worker Instance 1 - Builds the shared image
+  worker-1:
+    <<: *worker-service
+    container_name: surpluss-worker-1
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    pull_policy: build
+    environment:
+      <<: *worker-environment
+      WORKER_ID: worker-1
+
+  # Worker Instance 2 - Reuses the shared image
+  worker-2:
+    <<: *worker-service
+    container_name: surpluss-worker-2
+    pull_policy: never
+    environment:
+      <<: *worker-environment
+      WORKER_ID: worker-2
+
+  # Next.js Frontend
+  frontend:
+    container_name: surpluss-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: http://backend:3001
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      BACKEND_URL: http://backend:3001
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
