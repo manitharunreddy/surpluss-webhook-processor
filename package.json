@@ -7,7 +7,12 @@
     "migrate": "node-pg-migrate up --migrations-dir migrations",
     "migrate:down": "node-pg-migrate down --migrations-dir migrations",
     "migrate:dry": "node-pg-migrate up --migrations-dir migrations --dry-run",
-    "migrate:test": "node --env-file=.env.test ./node_modules/node-pg-migrate/bin/node-pg-migrate.js up --migrations-dir migrations"
+    "migrate:test": "node --env-file=.env.test ./node_modules/node-pg-migrate/bin/node-pg-migrate.js up --migrations-dir migrations",
+    "test:backend": "npm --prefix backend run test:e2e -- --runInBand",
+    "test:worker": "npm --prefix worker run test:e2e",
+    "test": "npm run test:backend && npm run test:worker",
+    "demo:burst": "node scripts/burst-test.mts",
+    "demo": "node scripts/demo.mts"
   },
   "keywords": [],
   "author": "",
